@@ -254,9 +254,7 @@ rule Make_ASV_table:
            -otutabout {output}  > {log} 2>&1
         """
 
-# Get the refaction depth ike so:
-# awk 'BEGIN{FS=OFS="\t"} NR>1{a+=$2; b+=$3; c+=$4; d+=$5; e+=$6; f+=$7; g+=$8; h+=$9; i+=$10; j+=$11} END{printf "%1.f\t%1.f\t%1.f\t%1.f\t%1.f\t%1.f\t%1.f\t%1.f\t%1.f\t%1.f\n", a,b,c,d,e,f,g,h,i,j}' 13.Make_ASV_table/feature_table.txt
-
+# Get the refaction depth like so:
 rule Summarize_table:
     input: rules.Make_ASV_table.output
     output: "14.Summarize_table/summary.txt"
@@ -265,8 +263,16 @@ rule Summarize_table:
         program=config['programs_path']['usearch']
     shell:
         """
-        {params.program} -otutab_stats {input} -output {output}
+        {params.program} -otutab_stats {input} -output {output} && \
+         (echo; echo -ne "Sample\\tSequence_number\\n") >> {output} && \
+         awk 'BEGIN{{FS="\\t"}}
+              NR==1{{ for(i=2;i<=NF;i++){{ header[i]=$i }} }}
+              {{ for(i=2;i<=NF;i++){{ sum[i]+=$i }} }}
+              END{{ for(i=2;i<=NF;i++){{ printf "%s\\t%g\\n", header[i],sum[i] }} }}
+             ' {input} | \
+         sort -k2n >> {output}
         """
+
 
 rule Rarefy:
     input: 
