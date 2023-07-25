@@ -1,4 +1,4 @@
-from os import path, makedirs, rename, remove
+from os import path
 
 # Show the rulegraph
 #  snakemake -s Snakefile --rulegraph | dot -Tpng > rulegraph.png
@@ -10,14 +10,6 @@ onsuccess:
 
 onerror:
     print("An error occurred")
-
-# Should an excel file with barcodes and sample names be coverted to TSV ?
-# Please note that it is assumed that the 5th and 2nd columns of sheet one
-#  in the Excel file are the sample names and barcodes, respectively
-isExcel=config['isExcel']  # True or False
-EXCEL_FILE=config['EXCEL_FILE']
-
-SAMPLES=config['SAMPLES']
 
 TAXON_LEVELS={'p':'Phylum', 'c': 'Class', 'o': 'Order','f': 'Family','g': 'Genus', 's': 'Species'}
 
@@ -50,30 +42,15 @@ rule Join_fastq:
 
 # Convert barcodes file from TSV to FASTA
 rule Parse_barcodes:
-    input: EXCEL_FILE #if isExcel else "01.raw_data/sample2barcode.tsv"
+    input: config['SAMPLE2BARCODE']
     output: "03.Parse_barcodes/bar.fasta"
     message: "Converting the barcodes file from TSV to FASTA.." 
-    params:
-        isExcel=isExcel,
-        program=config['programs_path']['xlsx2csv']
     threads: 1
     shell:
         """
-        ISEXCEL={params.isExcel}
-        if [ ${{ISEXCEL}} == True ]; then
-
-             {params.program} -d "tab" -s 1 {input} | \
-              awk 'BEGIN{{FS=OFS="\t"}} NR>1{{print($5,$2)}}' | \
-              awk '{{print ">"$1"\\n"$2}}' > {output}
-
-        else
-
-            awk '{{print ">"$1"\\n"$2}}' {input} > {output}
-
-        fi
+        awk '{{print ">"$1"\\n"$2}}' {input} > {output}
         """
         
-
 rule Reformat_barcodes:
     input: rules.Parse_barcodes.output
     output: "04.Reformat_barcodes/bar.fasta"
@@ -352,7 +329,7 @@ rule Summarize_taxonomy:
         table=rules.Make_ASV_table.output,
         taxonomy=rules.Assign_taxonomy.output
     output: expand("20.Summarize_taxonomy/{taxon_level}_table.txt", taxon_level=TAXON_LEVELS.values())
-    message: "Performing Beta diversity analysis..."
+    message: "Generating taxon level tables..."
     params:
         program=config['programs_path']['usearch']
     run:
